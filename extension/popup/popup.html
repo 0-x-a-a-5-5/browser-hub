@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px/1.4 system-ui, sans-serif; margin: 0; padding: 14px; width: 300px; color: #e5e7eb; background: #111827; }
+  h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7280; }
+  .dot.on { background: #22c55e; }
+  label { display: block; margin-top: 10px; color: #9ca3af; font-size: 12px; }
+  input { width: 100%; box-sizing: border-box; margin-top: 3px; padding: 6px 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #f9fafb; font: inherit; }
+  button { margin-top: 12px; padding: 7px 12px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+  button.secondary { background: #374151; margin-left: 6px; }
+  .status { margin-top: 10px; color: #9ca3af; font-size: 12px; min-height: 16px; }
+  .controllers { margin-top: 6px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; color: #fff; font-size: 11px; margin: 2px 4px 0 0; }
+  code { color: #d1d5db; }
+</style>
+</head>
+<body>
+  <h1><span class="dot" id="dot"></span> Browser Hub Agent</h1>
+  <label>This browser's name (what agents select it by)
+    <input id="name" placeholder="e.g. work, personal">
+  </label>
+  <label>Hub URL
+    <input id="hubUrl" placeholder="ws://127.0.0.1:8777/ext">
+  </label>
+  <label>Shared token (optional, must match the hub's BROWSER_HUB_TOKEN)
+    <input id="token" type="password" autocomplete="off">
+  </label>
+  <button id="save">Save &amp; reconnect</button>
+  <button id="reconnect" class="secondary">Reconnect</button>
+  <div class="status" id="status"></div>
+  <div class="controllers" id="controllers"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

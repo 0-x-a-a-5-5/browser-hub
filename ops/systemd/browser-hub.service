@@ -1,0 +1,16 @@
+[Unit]
+Description=Browser Hub (local relay between AI agents and Chrome extensions)
+Documentation=file://%h/.local/share/browser-hub/README.md
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/browser-hub
+Restart=on-failure
+RestartSec=2
+# systemd user units do not see zsh/nvm/conda; use the system node.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+Environment=BROWSER_HUB_PORT=8777
+
+[Install]
+WantedBy=default.target

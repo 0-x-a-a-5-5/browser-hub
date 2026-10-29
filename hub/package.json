@@ -1,0 +1,22 @@
+{
+  "name": "browser-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local relay between AI agents (MCP/CLI/HTTP) and Chrome profiles running the Browser Hub Agent extension.",
+  "bin": {
+    "browser-hub": "bin/browser-hub",
+    "browser-hub-mcp": "bin/browser-hub-mcp",
+    "browserctl": "bin/browserctl"
+  },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node bin/browser-hub",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.22.0",
+    "zod": "^3.25.0"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Browser Hub Agent",
+  "version": "0.1.0",
+  "description": "Lets any local AI agent drive this browser through the Browser Hub daemon. Shows a colored border while an agent is in control.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "alarms",
+    "debugger",
+    "webNavigation",
+    "webRequest"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "sw/index.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/console-capture.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/overlay.js", "content/dom.js", "content/console-buffer.js", "content/relay.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": { "default_popup": "popup/popup.html", "default_title": "Browser Hub Agent" },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+}
