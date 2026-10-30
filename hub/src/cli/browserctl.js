@@ -1,5 +1,6 @@
 // browserctl: drive a browser from the shell. Holds a hub session (and the border) while it runs.
 import fs from 'node:fs';
+import os from 'node:os';
 import { HubClient } from '../client.js';
 import { hubUrl } from '../config.js';
 
@@ -27,7 +28,7 @@ examples: browserctl browsers
           browserctl -b work eval 'document.title'`;
 
 function parseArgs(argv) {
-  const opts = { browser: process.env.BROWSER_HUB_BROWSER || null, hub: process.env.BROWSER_HUB_URL || hubUrl('/agent'), label: process.env.BROWSER_HUB_LABEL || 'browserctl', out: null };
+  const opts = { browser: process.env.BROWSER_HUB_BROWSER || null, hub: process.env.BROWSER_HUB_URL || hubUrl('/agent'), label: process.env.BROWSER_HUB_LABEL || `browserctl@${os.hostname()}`, out: null };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];

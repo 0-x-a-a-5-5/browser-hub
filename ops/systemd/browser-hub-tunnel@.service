@@ -1,0 +1,19 @@
+[Unit]
+Description=Browser Hub reverse tunnel: this machine's hub as 127.0.0.1:8777 on %i
+Documentation=file://%h/.local/share/browser-hub/README.md
+Wants=browser-hub.service
+After=browser-hub.service
+# ssh may fail many times in a row while the network is down; never give up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# %i is an ssh host alias from ~/.ssh/config; the key must work without a passphrase prompt.
+ExecStart=%h/.local/bin/browser-hub-tunnel %i
+Restart=always
+RestartSec=5
+# systemd user units do not see zsh config; ssh config "Match exec" probes need /usr/bin.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+
+[Install]
+WantedBy=default.target

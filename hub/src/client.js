@@ -33,7 +33,7 @@ export class HubClient {
       });
       ws.on('error', (e) => {
         this.connecting = null;
-        reject(hubError('HUB_UNREACHABLE', `Cannot reach the browser hub at ${this.url} (${e.message}). Start it with: systemctl --user start browser-hub`));
+        reject(hubError('HUB_UNREACHABLE', `Cannot reach the browser hub at ${this.url} (${e.message}). Local hub: systemctl --user start browser-hub. Hub on another machine: check browser-hub-tunnel@<this host> there.`));
       });
       ws.on('close', (code, reason) => {
         rpc.failAll(`hub connection closed (${code} ${reason})`);

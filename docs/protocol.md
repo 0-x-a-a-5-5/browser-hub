@@ -1,6 +1,7 @@
 # Browser Hub protocol
 
-All messages are JSON text frames. The hub listens on `127.0.0.1:8777` (env `BROWSER_HUB_PORT`).
+All messages are JSON text frames. The hub listens on `127.0.0.1:8777` (env `BROWSER_HUB_PORT`). On a
+machine that reaches a hub elsewhere through `browser-hub-tunnel`, the same address is the tunnel's end.
 
 ## Extension side: `ws://127.0.0.1:8777/ext`
 

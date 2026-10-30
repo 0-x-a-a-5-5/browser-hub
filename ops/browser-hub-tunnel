@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# browser-hub-tunnel <ssh-host> [remote-port] [local-port]
+#
+# Keep an ssh reverse tunnel open so that on <ssh-host>, 127.0.0.1:<remote-port> is this
+# machine's browser hub. Agents there (browser-hub-mcp, browserctl, curl) then drive the
+# browsers connected here without any other configuration: the hub stays loopback-only on
+# both ends and ssh does the authentication and encryption.
+#
+# Meant to run under systemd (browser-hub-tunnel@<ssh-host>.service), which restarts it
+# whenever ssh exits: a dropped link is noticed by the keepalives below within ~45 s, and a
+# forward that cannot be bound (the remote still holds a dead session's port) makes ssh exit
+# instead of running half-connected, so the restart loop keeps trying until it binds.
+set -euo pipefail
+
+host="${1:?usage: browser-hub-tunnel <ssh-host> [remote-port] [local-port]}"
+remote_port="${2:-${BROWSER_HUB_PORT:-8777}}"
+local_port="${3:-${BROWSER_HUB_PORT:-8777}}"
+
+echo "tunnel: ${host} 127.0.0.1:${remote_port} -> this machine 127.0.0.1:${local_port}"
+exec ssh -N -T \
+  -o BatchMode=yes \
+  -o ExitOnForwardFailure=yes \
+  -o ConnectTimeout=10 \
+  -o ServerAliveInterval=15 \
+  -o ServerAliveCountMax=3 \
+  -R "127.0.0.1:${remote_port}:127.0.0.1:${local_port}" \
+  "$host"

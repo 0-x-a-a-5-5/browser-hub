@@ -1,4 +1,5 @@
 // MCP stdio server: a thin adapter from MCP tool calls to hub methods.
+import os from 'node:os';
 import path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -9,7 +10,7 @@ import { hubUrl } from '../config.js';
 
 const client = new HubClient({
   url: process.env.BROWSER_HUB_URL || hubUrl('/agent'),
-  label: process.env.BROWSER_HUB_LABEL || path.basename(process.cwd()),
+  label: process.env.BROWSER_HUB_LABEL || `${path.basename(process.cwd())}@${os.hostname()}`,
   browser: process.env.BROWSER_HUB_BROWSER || null,
 });
 

@@ -42,7 +42,8 @@ agents target any number of profiles, and paints the target.
 | Piece | Where | Job |
 |---|---|---|
 | **Extension** (`extension/`) | loaded unpacked in each Chrome/Chromium/Brave profile | keeps a WebSocket to the hub, executes page commands, draws the border |
-| **Hub** (`hub/src/`, `browser-hub`) | one systemd user service per machine | registry of connected browsers and agent sessions; routes requests; tells extensions who controls them |
+| **Hub** (`hub/src/`, `browser-hub`) | one systemd user service on each machine that has browsers | registry of connected browsers and agent sessions; routes requests; tells extensions who controls them |
+| **Tunnel** (`browser-hub-tunnel`, `browser-hub-tunnel@.service`) | the machine with the browsers | ssh reverse forward that makes this hub `127.0.0.1:8777` on another machine (see *Two machines*) |
 | **MCP server** (`browser-hub-mcp`) | spawned by Claude Code or any MCP client | 23 tools, one hub session per client process |
 | **CLI** (`browserctl`) | your shell | same methods from scripts and by hand |
 | **HTTP** | `GET /browsers`, `POST /call` | for anything else; see `docs/protocol.md` |
@@ -98,10 +99,49 @@ Then, **once per Chrome profile** you want to control (Chrome offers no API or f
 Check with `browserctl browsers`. Browser names live inside each Chrome profile, so updates and reinstalls
 keep them.
 
-### Another machine
+### Another machine with its own browsers
 
 Copy or clone the repo there and run the same `ops/install.sh`; everything the machine runs from lives
 under `~/.local/share/browser-hub`, so extension and MCP paths are identical everywhere.
+
+### Two machines: drive this machine's browsers from another one
+
+Typical case: a laptop with the Chrome profiles and a dev box you ssh into, where Claude Code should
+see and drive the laptop's browser. The hub stays on the laptop; a reverse ssh tunnel makes it appear
+as `127.0.0.1:8777` on the dev box, so agents there need no configuration at all. Nothing listens on
+anything but loopback on either end, and ssh does the authentication, so it works wherever ssh works
+(LAN, VPN, a `Match … exec` fallback in `~/.ssh/config`).
+
+On the dev box (no browsers there, so no hub):
+
+```sh
+git clone https://github.com/0-x-a-a-5-5/browser-hub ~/src/browser-hub
+~/src/browser-hub/ops/install.sh --no-service
+```
+
+On the laptop, with `<alias>` an entry in `~/.ssh/config` whose key needs no passphrase prompt:
+
+```sh
+systemctl --user enable --now browser-hub-tunnel@<alias>.service
+```
+
+Then, on the dev box, `browserctl browsers` lists the laptop's profiles and Claude Code's `browser-hub`
+tools drive them; the border label on the laptop reads `<project>@<dev-box hostname>`, so you can see
+which machine is in control. The tunnel unit restarts ssh whenever it exits (keepalives notice a dead
+link within about 45 s) and starts `browser-hub.service` if it is not running.
+
+Worth knowing:
+
+- After an unclean drop (laptop suspended, network changed) sshd on the dev box may hold the port for a
+  dead session until its TCP keepalive gives up, during which the new tunnel exits with *remote port
+  forwarding failed* and is retried every 5 s. To shorten that window to about 90 s, set on the dev box
+  (needs root): `ClientAliveInterval 30` and `ClientAliveCountMax 3` in `/etc/ssh/sshd_config`.
+- Do not run a hub on the dev box on the same port; `--no-service` removes one if present. If the dev box
+  has browsers of its own, run its hub on another port (`BROWSER_HUB_PORT`) and give the tunnel the
+  matching port: `browser-hub-tunnel <alias> <remote-port>`; agents choose a hub with `BROWSER_HUB_URL`.
+- Everyone with a shell on the dev box can reach the tunnelled port, exactly as any local process can reach
+  a local hub. Set `BROWSER_HUB_TOKEN` on the laptop's service if that is not acceptable.
+- `journalctl --user -u browser-hub-tunnel@<alias> -f` shows connects and retries.
 
 ## Using it
 
@@ -111,8 +151,8 @@ Name the hub and the profile in the prompt, e.g. *"Using browser-hub, open the J
 browser."* Claude calls `browser_select work`, the `work` profile's windows get the border with the
 session's label, and the rest follows (`tab_new`, `read_page`, `click e12`, …).
 
-- Each Claude Code session is its own hub session with its own colour. The label defaults to the project
-  folder name; set `BROWSER_HUB_LABEL` to change it.
+- Each Claude Code session is its own hub session with its own colour. The label defaults to
+  `<project folder>@<hostname>`; set `BROWSER_HUB_LABEL` to change it.
 - Pin a project to a browser so you never have to name it, in that project's `.mcp.json`:
 
   ```json
@@ -171,7 +211,8 @@ The hub binds `127.0.0.1` only. Extension sockets must carry a `chrome-extension
 sockets and HTTP requests must carry *no* `Origin` header at all, so a web page can never reach the hub.
 Any local process can, which is the same trust level as the official extension's native-messaging host. To
 require a shared secret, set `BROWSER_HUB_TOKEN` for the service (`systemctl --user edit browser-hub`), the
-same value in each extension popup, and export it for agents.
+same value in each extension popup, and export it for agents. Reaching the hub from another machine goes
+through an ssh reverse tunnel (above), never by binding the hub to a network interface.
 
 The extension asks for `<all_urls>`, `tabs`, `scripting`, `debugger`, `webRequest`, `webNavigation`,
 `storage` and `alarms`. That is what driving arbitrary pages requires; load it only in profiles you want
