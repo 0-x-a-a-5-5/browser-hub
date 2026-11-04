@@ -77,7 +77,7 @@ and the other tools take those refs (`click e6`, `fill e3 ada@example.com`) or s
 ## Install
 
 Requirements: Linux with systemd user sessions, Node 20+ on the system `PATH` (the service cannot see
-nvm), npm, optionally rsync.
+nvm), npm, optionally rsync. For Windows, see [Windows](#windows).
 
 ```sh
 git clone https://github.com/0-x-a-a-5-5/browser-hub ~/src/browser-hub
@@ -142,6 +142,59 @@ Worth knowing:
 - Everyone with a shell on the dev box can reach the tunnelled port, exactly as any local process can reach
   a local hub. Set `BROWSER_HUB_TOKEN` on the laptop's service if that is not acceptable.
 - `journalctl --user -u browser-hub-tunnel@<alias> -f` shows connects and retries.
+
+### Windows
+
+**These steps have not been run on Windows yet.** They come from reading the code, which has nothing
+Linux-specific outside `ops/`. `ops/install.sh`, the systemd units and the tunnel do not work on Windows,
+so the setup is manual. Chrome, the hub and Claude Code all run on the Windows machine, so no tunnel is
+needed.
+
+Requirements: Node 20+ and git on `PATH`. In PowerShell:
+
+```powershell
+git clone https://github.com/0-x-a-a-5-5/browser-hub $HOME\browser-hub
+cd $HOME\browser-hub\hub
+npm.cmd install --omit=dev    # npm.cmd, because PowerShell's default policy can block npm.ps1
+node bin\browser-hub          # leave this window open; closing it stops the hub
+```
+
+In a second PowerShell window, register the MCP server with Claude Code:
+
+```powershell
+claude mcp add --scope user browser-hub -- node $HOME\browser-hub\hub\bin\browser-hub-mcp
+```
+
+Then, **once per Chrome profile** you want to control:
+
+1. `chrome://extensions` → enable *Developer mode* → *Load unpacked* → `C:\Users\<you>\browser-hub\extension`
+2. Click the extension's icon and give the profile a name. The dot turns green once it is connected to the
+   hub.
+
+Check with the command below, which should list the profile, then start a new Claude Code session so it
+picks up the tools. Wherever this README says `browserctl`, use this `node` form on Windows.
+
+```powershell
+node $HOME\browser-hub\hub\bin\browserctl browsers
+```
+
+To start the hub at login, without admin rights, add a shortcut to the Startup folder. It runs the hub in a
+minimized window, and closing that window stops the hub:
+
+```powershell
+$link = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Startup'))\Browser Hub.lnk")
+$link.TargetPath = (Get-Command node).Source
+$link.Arguments = "`"$HOME\browser-hub\hub\bin\browser-hub`""
+$link.WindowStyle = 7
+$link.Save()
+```
+
+- **Update:** in `$HOME\browser-hub\hub`, run `git pull` and `npm.cmd install --omit=dev`, restart the hub,
+  then click *Reload* on the extension at `chrome://extensions`. Browser names are kept.
+- **Shared secret** (see *Security model*): run `setx BROWSER_HUB_TOKEN <secret>`, open a new window, restart
+  the hub and any agents from there, and enter the same value in each extension popup.
+- **Uninstall:** run `claude mcp remove --scope user browser-hub`, delete the Startup shortcut and
+  `$HOME\browser-hub`, and remove the extension from each profile.
 
 ## Using it
 
