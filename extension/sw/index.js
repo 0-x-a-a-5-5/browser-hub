@@ -25,7 +25,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'overlay:state') {
     sendResponse(control.stateForTab(sender.tab?.id));
   } else if (msg?.type === 'popup:status') {
-    sendResponse({ connected: link.connected, hubUrl: link.url, lastError: link.lastError, control: control.current() });
+    sendResponse({ connected: link.connected, acceptedAt: link.acceptedAt, hubUrl: link.url, lastError: link.lastError, control: control.current() });
   } else if (msg?.type === 'popup:reconnect') {
     link.reconnect();
     sendResponse({ ok: true });

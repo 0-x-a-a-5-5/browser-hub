@@ -14,6 +14,7 @@ export class HubLink {
     this.pingTimer = null;
     this.retryTimer = null;
     this.lastError = '';
+    this.acceptedAt = 0; // when the hub accepted the current socket (its first control message); the popup waits on it
   }
 
   get connected() {
@@ -42,6 +43,7 @@ export class HubLink {
     ws.onopen = () => {
       this.backoff = 1000;
       this.lastError = '';
+      this.acceptedAt = 0;
       this.send(this.helloMessage());
       this.startPing();
     };
@@ -105,6 +107,7 @@ export class HubLink {
       case 'pong':
         return;
       case 'control':
+        if (!this.acceptedAt) this.acceptedAt = Date.now();
         this.onControl(msg);
         return;
       case 'req':
