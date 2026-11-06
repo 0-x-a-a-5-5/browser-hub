@@ -5,8 +5,18 @@ import { HubClient } from '../src/client.js';
 import { startFakeExtension } from './fake-extension.js';
 
 const PORT = 18777 + Math.floor(Math.random() * 1000);
+const IDLE_PORT = 20777 + Math.floor(Math.random() * 1000);
 let hub, extA, extB;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function waitFor(predicate, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await sleep(10);
+  }
+  assert.ok(predicate(), 'timed out waiting for condition');
+}
 
 before(async () => {
   hub = await startHub({ port: PORT });
@@ -146,5 +156,77 @@ test('popup release ignores another browser and unknown sessions', async () => {
     assert.equal(browsers.browsers.length, 2);
   } finally {
     c.close();
+  }
+});
+
+test('agent idle release', async (t) => {
+  const agentIdleMs = 150;
+  const idleHub = await startHub({ port: IDLE_PORT, agentIdleMs });
+  const idleExt = startFakeExtension({
+    port: IDLE_PORT,
+    browserId: 'id-idle',
+    name: 'idle-browser',
+    delays: { 'browser.identify': agentIdleMs * 3 },
+  });
+
+  try {
+    await idleExt.ready;
+    await waitFor(() => idleHub.registry.browsers.has('id-idle'));
+
+    await t.test('releases control while keeping the socket and selection', async () => {
+      const c = new HubClient({ url: `ws://127.0.0.1:${IDLE_PORT}/agent`, label: 'idle-agent' });
+      try {
+        await c.call('browser.select', { browser: 'idle-browser' });
+        await c.call('page.snapshot', { tabId: 12 });
+        await waitFor(() => idleExt.state.control?.agents.some((a) => a.label === 'idle-agent'));
+
+        const session = [...idleHub.registry.sessions.values()].find((s) => s.label === 'idle-agent');
+        assert.equal(session.browserId, 'id-idle');
+        assert.equal(session.currentTabId, 12);
+
+        await waitFor(() => idleExt.state.control?.active === false);
+        assert.deepEqual(idleExt.state.control.agents, []);
+        assert.equal(c.ws.readyState, 1, 'agent socket should stay open');
+
+        const listed = await (await fetch(`http://127.0.0.1:${IDLE_PORT}/browsers`)).json();
+        assert.deepEqual(listed.browsers[0].controlledBy, []);
+        assert.equal(session.browserId, 'id-idle');
+        assert.equal(session.currentTabId, 12);
+
+        const tabs = await c.call('tabs.list');
+        assert.equal(tabs.windows.length, 1);
+        assert.equal(idleExt.state.control.active, true);
+        assert.deepEqual(idleExt.state.control.agents.map((a) => a.label), ['idle-agent']);
+        assert.equal(session.currentTabId, 12);
+      } finally {
+        c.close();
+        await waitFor(() => idleExt.state.control?.active === false);
+      }
+    });
+
+    await t.test('does not release control while a request is in flight', async () => {
+      const c = new HubClient({ url: `ws://127.0.0.1:${IDLE_PORT}/agent`, label: 'slow-agent', browser: 'idle-browser' });
+      try {
+        await c.connect();
+        await waitFor(() => idleExt.state.control?.agents.some((a) => a.label === 'slow-agent'));
+
+        const callsBefore = idleExt.state.calls.length;
+        const controlsBefore = idleExt.state.controls.length;
+        const pending = c.call('browser.identify');
+        await waitFor(() => idleExt.state.calls.length > callsBefore);
+        await sleep(agentIdleMs + 75);
+
+        assert.equal(idleExt.state.control.active, true);
+        assert.ok(idleExt.state.controls.slice(controlsBefore).every((control) => control.active));
+        await pending;
+        assert.equal(idleExt.state.control.active, true);
+        await waitFor(() => idleExt.state.control?.active === false);
+      } finally {
+        c.close();
+      }
+    });
+  } finally {
+    idleExt.close();
+    await idleHub.close();
   }
 });

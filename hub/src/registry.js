@@ -41,6 +41,6 @@ export class Registry {
   }
 
   controllersOf(browserId) {
-    return [...this.sessions.values()].filter((s) => s.browserId === browserId);
+    return [...this.sessions.values()].filter((s) => s.browserId === browserId && !s.idle);
   }
 }

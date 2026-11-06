@@ -10,7 +10,7 @@ import { log } from './log.js';
 
 const EXT_IDLE_MS = 75_000; // extensions ping every 20s
 
-export function startHub({ host = config.host, port = config.port } = {}) {
+export function startHub({ host = config.host, port = config.port, agentIdleMs = config.agentIdleMs } = {}) {
   const registry = new Registry();
   const dispatch = createDispatcher(registry);
   const server = http.createServer(createHttpHandler(registry, dispatch));
@@ -25,7 +25,7 @@ export function startHub({ host = config.host, port = config.port } = {}) {
     }
     if (pathname === '/agent') {
       if (origin) return refuse(socket, 403); // only non-browser clients
-      return wss.handleUpgrade(req, socket, head, (ws) => attachAgent(ws, registry, dispatch));
+      return wss.handleUpgrade(req, socket, head, (ws) => attachAgent(ws, registry, dispatch, agentIdleMs));
     }
     refuse(socket, 404);
   });

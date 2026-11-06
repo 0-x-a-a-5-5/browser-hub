@@ -1,9 +1,9 @@
 // A stand-in for the Chrome extension: speaks the /ext protocol with canned answers.
 import WebSocket from 'ws';
 
-export function startFakeExtension({ port, browserId, name, token = '' }) {
+export function startFakeExtension({ port, browserId, name, token = '', delays = {} }) {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ext`, { origin: 'chrome-extension://fakefakefakefakefakefakefakefake' });
-  const state = { control: null, calls: [], tabs: [{ tabId: 11, windowId: 1, active: true, title: 'Tab A', url: 'https://a.test/' }, { tabId: 12, windowId: 1, active: false, title: 'Tab B', url: 'https://b.test/' }] };
+  const state = { control: null, controls: [], calls: [], tabs: [{ tabId: 11, windowId: 1, active: true, title: 'Tab A', url: 'https://a.test/' }, { tabId: 12, windowId: 1, active: false, title: 'Tab B', url: 'https://b.test/' }] };
   const ready = new Promise((resolve, reject) => {
     ws.on('open', () => {
       ws.send(JSON.stringify({ type: 'hello', browserId, name, token, meta: { brands: ['Fake 1'] } }));
@@ -13,10 +13,15 @@ export function startFakeExtension({ port, browserId, name, token = '' }) {
   });
   ws.on('message', (raw) => {
     const msg = JSON.parse(raw);
-    if (msg.type === 'control') { state.control = msg; return; }
+    if (msg.type === 'control') { state.control = msg; state.controls.push(msg); return; }
     if (msg.type !== 'req') return;
     state.calls.push({ method: msg.method, params: msg.params });
-    const reply = (ok, body) => ws.send(JSON.stringify({ type: 'res', id: msg.id, ok, ...(ok ? { result: body } : { error: body }) }));
+    const reply = (ok, body) => {
+      const send = () => ws.send(JSON.stringify({ type: 'res', id: msg.id, ok, ...(ok ? { result: body } : { error: body }) }));
+      const delay = delays[msg.method] || 0;
+      if (delay) setTimeout(send, delay);
+      else send();
+    };
     switch (msg.method) {
       case 'browser.summary': return reply(true, { windows: 1, tabs: state.tabs.length });
       case 'tabs.list': return reply(true, { windows: [{ windowId: 1, tabs: state.tabs }] });

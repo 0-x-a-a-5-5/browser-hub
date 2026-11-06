@@ -34,6 +34,10 @@ One socket = one session. The session remembers the selected browser and the las
 (`currentTabId`); any method that needs a tab and is called without `tabId` uses it. Closing the socket
 releases the browser (border goes off).
 
+After `BROWSER_HUB_AGENT_IDLE_MS` without a request (60 s by default; 0 disables), the hub pushes
+`control` without that session and omits it from `controlledBy`, but keeps its selection. Its next request
+brings it back.
+
 The hub may close an agent socket with code 4004 and reason "disconnected by the user from the browser
 popup"; `HubClient` then raises `DISCONNECTED_BY_USER` once on the next call, and the following call
 reconnects without re-selecting the browser.

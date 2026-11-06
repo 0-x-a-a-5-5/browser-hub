@@ -50,8 +50,9 @@ agents target any number of profiles, and paints the target.
 
 A session selects a browser (`browser_select work`); from then on every call goes there, and the hub
 remembers the last tab the session touched so `tabId` is optional. Two sessions can share a browser; the
-label shows both names. When the session ends, the border goes away. The popup's "Controlled by" row has
-a square stop button for each agent that disconnects only that session.
+label shows both names. When the session ends—or after about a minute without calls—the border goes away,
+and it comes back on the next call. The popup's "Controlled by" row has a square stop button for each agent
+that disconnects only that session.
 
 ## What agents get
 

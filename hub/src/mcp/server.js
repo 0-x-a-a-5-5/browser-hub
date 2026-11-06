@@ -14,7 +14,7 @@ const client = new HubClient({
   browser: process.env.BROWSER_HUB_BROWSER || null,
 });
 
-const server = new Server({ name: 'browser-hub', version: '0.2.1' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'browser-hub', version: '0.2.2' }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),

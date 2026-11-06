@@ -2,11 +2,13 @@
 import { randomUUID } from 'node:crypto';
 import { config } from './config.js';
 import { pushControl } from './control.js';
+import { createIdle } from './idle.js';
 import { log } from './log.js';
 
-export function attachAgent(ws, registry, dispatch) {
-  const session = { id: randomUUID(), label: 'agent', color: registry.nextColor(), browserId: null, currentTabId: null, persistent: true };
+export function attachAgent(ws, registry, dispatch, idleMs) {
+  const session = { id: randomUUID(), label: 'agent', color: registry.nextColor(), browserId: null, currentTabId: null, persistent: true, idle: false };
   session.disconnect = (reason) => ws.close(4004, reason);
+  const idle = createIdle(session, registry, idleMs, pushControl);
   let greeted = false;
 
   ws.on('message', async (raw) => {
@@ -16,15 +18,21 @@ export function attachAgent(ws, registry, dispatch) {
     if (msg.type === 'hello') { await hello(msg); return; }
     if (!greeted) { ws.close(4003, 'send hello first'); return; }
     if (msg.type !== 'req') return;
+    idle.begin();
     try {
-      const result = await dispatch(session, msg.method, msg.params || {});
-      send({ type: 'res', id: msg.id, ok: true, result });
-    } catch (e) {
-      send({ type: 'res', id: msg.id, ok: false, error: { code: e.code || 'ERROR', message: e.message } });
+      try {
+        const result = await dispatch(session, msg.method, msg.params || {});
+        send({ type: 'res', id: msg.id, ok: true, result });
+      } catch (e) {
+        send({ type: 'res', id: msg.id, ok: false, error: { code: e.code || 'ERROR', message: e.message } });
+      }
+    } finally {
+      idle.end();
     }
   });
 
   ws.on('close', () => {
+    idle.stop();
     registry.removeSession(session.id);
     if (session.browserId) pushControl(registry, registry.browsers.get(session.browserId));
     log('agent.disconnected', { label: session.label });
@@ -33,16 +41,21 @@ export function attachAgent(ws, registry, dispatch) {
 
   async function hello(msg) {
     if (config.token && msg.token !== config.token) { ws.close(4001, 'bad token'); return; }
+    idle.begin();
     greeted = true;
     session.label = String(msg.label || session.label).slice(0, 60);
     registry.addSession(session);
     let warning;
-    if (msg.browser) {
-      try { await dispatch(session, 'browser.select', { browser: msg.browser }); }
-      catch (e) { warning = e.message; }
+    try {
+      if (msg.browser) {
+        try { await dispatch(session, 'browser.select', { browser: msg.browser }); }
+        catch (e) { warning = e.message; }
+      }
+      log('agent.connected', { label: session.label, browser: msg.browser, warning });
+      send({ type: 'welcome', sessionId: session.id, color: session.color, selected: session.browserId, warning });
+    } finally {
+      idle.end();
     }
-    log('agent.connected', { label: session.label, browser: msg.browser, warning });
-    send({ type: 'welcome', sessionId: session.id, color: session.color, selected: session.browserId, warning });
   }
 
   function send(obj) {
