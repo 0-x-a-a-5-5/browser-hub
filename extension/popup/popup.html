@@ -21,8 +21,15 @@
   button.ok { background: #16a34a; cursor: default; }
   button.fail { background: #dc2626; cursor: default; }
   .status { margin-top: 10px; color: #9ca3af; font-size: 12px; min-height: 16px; }
-  .controllers { margin-top: 6px; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; color: #fff; font-size: 11px; margin: 2px 4px 0 0; }
+  .controllers { margin-top: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .pill { display: inline-flex; align-items: center; padding: 2px 3px 2px 8px; border-radius: 999px; color: #fff; font-size: 11px; }
+  button.stop { width: 18px; height: 18px; margin: 0 0 0 4px; padding: 0; border: 0; border-radius: 4px; background: rgba(255, 255, 255, .14); color: inherit;
+                display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; transition: background-color .15s, opacity .15s; }
+  button.stop:hover:not(:disabled) { background: rgba(255, 255, 255, .28); }
+  button.stop:active:not(:disabled) { background: rgba(255, 255, 255, .36); transform: none; box-shadow: none; }
+  button.stop:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  button.stop:disabled { cursor: default; opacity: .45; }
+  button.stop svg { width: 10px; height: 10px; fill: currentColor; }
   code { color: #d1d5db; }
 </style>
 </head>

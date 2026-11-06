@@ -6,6 +6,7 @@ import { log } from './log.js';
 
 export function attachAgent(ws, registry, dispatch) {
   const session = { id: randomUUID(), label: 'agent', color: registry.nextColor(), browserId: null, currentTabId: null, persistent: true };
+  session.disconnect = (reason) => ws.close(4004, reason);
   let greeted = false;
 
   ws.on('message', async (raw) => {

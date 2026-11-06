@@ -31,5 +31,5 @@ export function startFakeExtension({ port, browserId, name, token = '' }) {
       default: return reply(false, { code: 'UNKNOWN_METHOD', message: msg.method });
     }
   });
-  return { ws, state, ready, close: () => ws.close() };
+  return { ws, state, ready, release: (sessionId) => ws.send(JSON.stringify({ type: 'release', sessionId })), close: () => ws.close() };
 }

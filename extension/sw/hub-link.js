@@ -100,6 +100,10 @@ export class HubLink {
     return true;
   }
 
+  release(sessionId) {
+    return this.send({ type: 'release', sessionId });
+  }
+
   receive(raw) {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }

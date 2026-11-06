@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Hub Agent",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Lets any local AI agent drive this browser through the Browser Hub daemon. Shows a colored border while an agent is in control.",
   "minimum_chrome_version": "116",
   "permissions": [

@@ -1,5 +1,5 @@
 // Agent-side client used by the MCP server and the CLI. Reconnects lazily and re-selects
-// the last browser so a hub restart does not strand the session.
+// the last browser after ordinary drops; a popup release clears that selection.
 import WebSocket from 'ws';
 import { WsRpc } from './ws-rpc.js';
 import { config, hubUrl } from './config.js';
@@ -16,6 +16,7 @@ export class HubClient {
     this.rpc = null;
     this.welcome = null;
     this.connecting = null;
+    this.releaseReason = null;
   }
 
   connect() {
@@ -37,6 +38,10 @@ export class HubClient {
       });
       ws.on('close', (code, reason) => {
         rpc.failAll(`hub connection closed (${code} ${reason})`);
+        if (code === 4004) {
+          this.browser = null;
+          this.releaseReason = reason.toString();
+        }
         if (this.ws === ws) { this.ws = null; this.rpc = null; }
         this.connecting = null;
         reject(hubError('HUB_CLOSED', `hub closed the connection (${code} ${reason || ''})`.trim()));
@@ -46,6 +51,11 @@ export class HubClient {
   }
 
   async call(method, params = {}) {
+    if (this.releaseReason !== null) {
+      const reason = this.releaseReason;
+      this.releaseReason = null;
+      throw hubError('DISCONNECTED_BY_USER', `${reason}. The hub will accept a new connection on the following call; select a browser again only if the user wants you to.`);
+    }
     await this.connect();
     const result = await this.rpc.request(method, params);
     if (method === 'browser.select' && result?.selected?.name) this.browser = result.selected.name;

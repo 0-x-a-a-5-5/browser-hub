@@ -17,6 +17,14 @@ export function attachExtension(ws, registry) {
       case 'ping': ws.send('{"type":"pong"}'); return;
       case 'res': rpc.handleResponse(msg); return;
       case 'hello': hello(msg); return;
+      case 'release': {
+        if (!browser) return;
+        const session = registry.sessions.get(msg.sessionId);
+        if (!session || session.browserId !== browser.id) return;
+        session.disconnect('disconnected by the user from the browser popup');
+        log('agent.released', { label: session.label, browser: browser.name });
+        return;
+      }
       case 'meta':
         if (!browser) return;
         if (msg.name) browser.name = String(msg.name);

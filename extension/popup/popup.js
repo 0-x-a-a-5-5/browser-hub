@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_HUB_URL = 'ws://127.0.0.1:8777/ext';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pendingSessionIds = new Set();
+let currentStatus = null;
 
 async function load() {
   const s = await chrome.storage.local.get(['browserId', 'name', 'hubUrl', 'token']);
@@ -20,6 +22,7 @@ async function refresh() {
 }
 
 function render(st) {
+  currentStatus = st;
   const connected = !!st?.connected;
   $('dot').classList.toggle('on', connected);
   $('status').textContent = connected
@@ -27,11 +30,19 @@ function render(st) {
     : `Not connected${st?.lastError ? ` (${st.lastError})` : ''}. Is browser-hub running?`;
   const agents = st?.control?.agents || [];
   $('controllers').innerHTML = agents.length
-    ? 'Controlled by: ' + agents.map((a) => `<span class="pill" style="background:${a.color || '#ff2d55'}">${escapeHtml(a.label || 'agent')}</span>`).join('')
+    ? '<span>Controlled by:</span>' + agents.map(controllerPill).join('')
     : '<span style="color:#6b7280">No agent is controlling this browser.</span>';
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function controllerPill(agent) {
+  const sessionId = String(agent.sessionId || '');
+  const label = String(agent.label || 'agent');
+  const action = escapeHtml(`Disconnect ${label}`);
+  const disabled = pendingSessionIds.has(sessionId) ? ' disabled' : '';
+  return `<span class="pill" style="background:${escapeHtml(agent.color || '#ff2d55')}"><span class="pill-label">${escapeHtml(label)}</span><button type="button" class="stop" data-session-id="${escapeHtml(sessionId)}" title="${action}" aria-label="${action}"${disabled}><svg viewBox="0 0 10 10"><rect width="10" height="10" rx="1.5"/></svg></button></span>`;
+}
 
 function readForm() {
   return { name: $('name').value.trim(), hubUrl: $('hubUrl').value.trim() || DEFAULT_HUB_URL, token: $('token').value };
@@ -52,18 +63,41 @@ function requestReconnect() {
   return chrome.runtime.sendMessage({ type: 'popup:reconnect' }).catch(() => {});
 }
 
-// Polls until the hub has accepted a connection made after `since`, or the timeout passes.
-// A service worker older than this popup reports no acceptedAt; then any live connection counts.
-async function waitForConnection(since, timeoutMs = 4000) {
+async function pollStatus(predicate, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let status = null;
   while (Date.now() < deadline) {
     status = await getStatus();
-    const fresh = status?.acceptedAt === undefined || status.acceptedAt >= since;
-    if (status?.connected && fresh) return { ok: true, status };
+    if (predicate(status)) return { ok: true, status };
     await sleep(150);
   }
   return { ok: false, status };
+}
+
+// Polls until the hub has accepted a connection made after `since`, or the timeout passes.
+// A service worker older than this popup reports no acceptedAt; then any live connection counts.
+function waitForConnection(since, timeoutMs = 4000) {
+  return pollStatus((status) => {
+    const fresh = status?.acceptedAt === undefined || status.acceptedAt >= since;
+    return status?.connected && fresh;
+  }, timeoutMs);
+}
+
+async function releaseSession(sessionId, label) {
+  pendingSessionIds.add(sessionId);
+  render(currentStatus);
+  let response = null;
+  try { response = await chrome.runtime.sendMessage({ type: 'popup:release', sessionId }); } catch { /* service worker unavailable */ }
+  if (!response?.ok) {
+    pendingSessionIds.delete(sessionId);
+    render(await getStatus());
+    $('status').textContent = 'Failed: not connected to the hub';
+    return;
+  }
+  const result = await pollStatus((status) => status && !(status.control?.agents || []).some((a) => String(a.sessionId) === sessionId), 3000);
+  pendingSessionIds.delete(sessionId);
+  render(result.status);
+  if (!result.ok) $('status').textContent = `Failed: ${label} did not disconnect`;
 }
 
 // Click feedback: the button is disabled with a busy label while the action runs, then shows the
@@ -98,6 +132,13 @@ $('save').addEventListener('click', (ev) => withFeedback(ev.currentTarget,
 
 $('reconnect').addEventListener('click', (ev) => withFeedback(ev.currentTarget,
   { busy: 'Reconnecting…', ok: 'Connected ✓', fail: 'Not connected' }, requestReconnect));
+
+$('controllers').addEventListener('click', (ev) => {
+  const button = ev.target.closest?.('button.stop');
+  if (!button || pendingSessionIds.has(button.dataset.sessionId)) return;
+  const label = button.closest('.pill')?.querySelector('.pill-label')?.textContent || 'agent';
+  releaseSession(button.dataset.sessionId, label);
+});
 
 load();
 setInterval(refresh, 2000);

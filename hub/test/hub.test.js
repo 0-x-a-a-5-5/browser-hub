@@ -100,3 +100,51 @@ test('timeouts surface as TIMEOUT', async () => {
   await assert.rejects(b.rpc.request('slow.call', {}, 200), (e) => e.code === 'TIMEOUT');
   c.close();
 });
+
+test('popup release disconnects only the selected agent session', async () => {
+  const one = new HubClient({ url: `ws://127.0.0.1:${PORT}/agent`, label: 'one', browser: 'work' });
+  const two = new HubClient({ url: `ws://127.0.0.1:${PORT}/agent`, label: 'two', browser: 'work' });
+  try {
+    await Promise.all([one.connect(), two.connect()]);
+    await sleep(50);
+    assert.equal(extA.state.control.agents.length, 2);
+    const sessionId = extA.state.control.agents.find((a) => a.label === 'one').sessionId;
+    extA.release(sessionId);
+    await sleep(50);
+    assert.equal(extA.state.control.active, true);
+    assert.deepEqual(extA.state.control.agents.map((a) => a.label), ['two']);
+    await assert.rejects(one.call('tabs.list'), (e) => {
+      assert.equal(e.code, 'DISCONNECTED_BY_USER');
+      assert.equal(e.message, 'disconnected by the user from the browser popup. The hub will accept a new connection on the following call; select a browser again only if the user wants you to.');
+      return true;
+    });
+    await assert.rejects(one.call('tabs.list'), (e) => e.code === 'AMBIGUOUS_BROWSER');
+    const tabs = await two.call('tabs.list');
+    assert.equal(tabs.windows.length, 1);
+  } finally {
+    one.close();
+    two.close();
+  }
+});
+
+test('popup release ignores another browser and unknown sessions', async () => {
+  const c = new HubClient({ url: `ws://127.0.0.1:${PORT}/agent`, label: 'work-owner', browser: 'work' });
+  try {
+    await c.connect();
+    await sleep(50);
+    const session = extA.state.control.agents.find((a) => a.label === 'work-owner');
+    extB.release(session.sessionId);
+    await sleep(50);
+    assert.ok(extA.state.control.agents.some((a) => a.sessionId === session.sessionId));
+    const tabs = await c.call('tabs.list');
+    assert.equal(tabs.windows.length, 1);
+
+    extA.release('unknown-session');
+    await sleep(50);
+    assert.equal(extA.ws.readyState, 1);
+    const browsers = await c.call('browsers.list');
+    assert.equal(browsers.browsers.length, 2);
+  } finally {
+    c.close();
+  }
+});

@@ -12,6 +12,7 @@ Origin must be `chrome-extension://…`.
 | ext → hub | `{type:"hello", browserId, name, token?, meta:{brands, platform, extensionVersion}}` |
 | ext → hub | `{type:"ping"}` every 20 s; hub answers `{type:"pong"}` |
 | ext → hub | `{type:"meta", name?, meta?}` when the user renames the browser |
+| ext → hub | `{type:"release", sessionId}` drops that agent session's socket with close code 4004 if it controls this browser |
 | hub → ext | `{type:"req", id, method, params}` |
 | ext → hub | `{type:"res", id, ok:true, result}` or `{type:"res", id, ok:false, error:{code, message}}` |
 | hub → ext | `{type:"control", active:bool, agents:[{sessionId, label, color}]}` drives the border overlay |
@@ -32,6 +33,10 @@ Must **not** send an `Origin` header (browsers always do; that is how web pages 
 One socket = one session. The session remembers the selected browser and the last tab it touched
 (`currentTabId`); any method that needs a tab and is called without `tabId` uses it. Closing the socket
 releases the browser (border goes off).
+
+The hub may close an agent socket with code 4004 and reason "disconnected by the user from the browser
+popup"; `HubClient` then raises `DISCONNECTED_BY_USER` once on the next call, and the following call
+reconnects without re-selecting the browser.
 
 Hub-handled methods:
 
@@ -69,7 +74,8 @@ Everything else is forwarded to the selected browser's extension (or `params.bro
 | `window.list` | | |
 
 Error codes you will meet: `NO_BROWSERS`, `AMBIGUOUS_BROWSER`, `NO_SUCH_BROWSER`, `BROWSER_GONE`,
-`NO_TAB`, `NO_PAGE_ACCESS`, `STALE_REF`, `DEBUGGER_ATTACH_FAILED`, `JS_EXCEPTION`, `TIMEOUT`, `BAD_PARAMS`.
+`NO_TAB`, `NO_PAGE_ACCESS`, `STALE_REF`, `DEBUGGER_ATTACH_FAILED`, `JS_EXCEPTION`, `TIMEOUT`, `BAD_PARAMS`,
+`DISCONNECTED_BY_USER`.
 
 ## HTTP (stateless)
 

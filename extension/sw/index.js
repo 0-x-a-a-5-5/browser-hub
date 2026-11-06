@@ -29,6 +29,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg?.type === 'popup:reconnect') {
     link.reconnect();
     sendResponse({ ok: true });
+  } else if (msg?.type === 'popup:release') {
+    sendResponse({ ok: link.release(msg.sessionId) });
   }
   return false;
 });
