@@ -250,8 +250,10 @@ The full wire protocol (extension side and agent side) is in [`docs/protocol.md`
 - **Two kinds of input.** `click ref` and `fill` act on the DOM directly: no banner, works under overlays,
   fires the `input`/`change` events frameworks listen for. Coordinate clicks, `click … trusted=true`,
   `type`, `press_key`, `hover`, wheel `scroll` and `evaluate` send real events through `chrome.debugger`,
-  which Chrome announces with its yellow "is debugging this browser" bar. The debugger detaches (bar goes
-  away) when no agent controls the browser any more.
+  which Chrome announces with its yellow "is debugging this browser" bar. Chrome shows that bar in every
+  window of every profile, not only the one being driven. The extension therefore detaches about 3 s after
+  the last debugger command on a tab (and at once when no agent controls the browser), so the bar is up only
+  while such commands are running.
 - **Screenshots** are rescaled to CSS pixels, so coordinates read off the image are the coordinates you
   click. The border and label are hidden during capture unless `includeOverlay` is set.
 - **Console and network** are recorded passively per tab (a MAIN-world console shim and `webRequest`), so
